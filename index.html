@@ -74,8 +74,17 @@
     text-wrap: balance;
   }
   .remaining strong { color: var(--ink); font-weight: 600; }
-  .format {
+  .time.with-seconds {
+    font-size: clamp(3rem, 14vw, 11rem);
+  }
+  .controls {
     margin-top: clamp(12px, 4vh, 40px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .format {
     display: inline-flex;
     border: 1.5px solid rgba(255, 255, 255, 0.55);
     border-radius: 999px;
@@ -111,9 +120,15 @@
   <div class="time" id="time">--</div>
   <div class="desc" id="desc"></div>
   <div class="remaining" id="remaining"></div>
-  <div class="format" role="group" aria-label="Clock format">
-    <button type="button" id="fmt12" aria-pressed="true">12 hour</button>
-    <button type="button" id="fmt24" aria-pressed="false">24 hour</button>
+  <div class="controls">
+    <div class="format" role="group" aria-label="Clock format">
+      <button type="button" id="fmt12" aria-pressed="true">12 hour</button>
+      <button type="button" id="fmt24" aria-pressed="false">24 hour</button>
+    </div>
+    <div class="format" role="group" aria-label="Seconds">
+      <button type="button" id="secOff" aria-pressed="true">No seconds</button>
+      <button type="button" id="secOn" aria-pressed="false">Seconds</button>
+    </div>
   </div>
 </main>
 
@@ -163,15 +178,22 @@
   var use24 = false;
   try { use24 = localStorage.getItem("sandonClock24") === "1"; } catch (e) {}
 
+  var useSecs = false;
+  try { useSecs = localStorage.getItem("sandonClockSecs") === "1"; } catch (e) {}
+
   function clockText(secs) {
     var h24 = Math.floor(secs / 3600) % 24;
     var m = Math.floor((secs % 3600) / 60);
+    var sec = secs % 60;
+    var mm = (m < 10 ? "0" : "") + m;
+    var sepChar = use24 ? ":" : ".";
+    var ss = useSecs ? sepChar + (sec < 10 ? "0" : "") + sec : "";
     if (use24) {
-      return (h24 < 10 ? "0" : "") + h24 + "." + (m < 10 ? "0" : "") + m;
+      return (h24 < 10 ? "0" : "") + h24 + sepChar + mm + ss;
     }
     var suffix = h24 >= 12 ? "pm" : "am";
     var h = h24 % 12 === 0 ? 12 : h24 % 12;
-    return h + "." + (m < 10 ? "0" : "") + m + suffix;
+    return h + sepChar + mm + ss + suffix;
   }
 
   function remainingText(secs) {
@@ -223,6 +245,7 @@
 
     document.body.setAttribute("data-state", state);
     els.time.textContent = clockText(s);
+    els.time.classList.toggle("with-seconds", useSecs);
     els.desc.textContent = desc;
     els.remaining.innerHTML = remaining;
     document.title = clockText(s) + " " + desc.replace(/\.$/, "");
@@ -241,8 +264,23 @@
   btn12.addEventListener("click", function () { setFormat(false); });
   btn24.addEventListener("click", function () { setFormat(true); });
 
+  var btnSecOff = document.getElementById("secOff");
+  var btnSecOn = document.getElementById("secOn");
+
+  function setSeconds(on) {
+    useSecs = on;
+    btnSecOff.setAttribute("aria-pressed", String(!on));
+    btnSecOn.setAttribute("aria-pressed", String(on));
+    try { localStorage.setItem("sandonClockSecs", on ? "1" : "0"); } catch (e) {}
+    tick();
+  }
+  btnSecOff.addEventListener("click", function () { setSeconds(false); });
+  btnSecOn.addEventListener("click", function () { setSeconds(true); });
+
   btn12.setAttribute("aria-pressed", String(!use24));
   btn24.setAttribute("aria-pressed", String(use24));
+  btnSecOff.setAttribute("aria-pressed", String(!useSecs));
+  btnSecOn.setAttribute("aria-pressed", String(useSecs));
   tick();
   setInterval(tick, 500);
 </script>
