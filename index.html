@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sandon School Clock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ink: #ffffff;
+    --ink-soft: rgba(255, 255, 255, 0.82);
+    --green: #1b7a3d;
+    --orange: #b95410;
+    --red: #b3261e;
+    --blue: #274690;
+    --closed: #2a2f3a;
+    --bg: var(--closed);
+    color-scheme: dark;
+  }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding-inline: 16px;
+    transition: background-color 0.6s ease;
+  }
+  body[data-state="green"] { --bg: var(--green); }
+  body[data-state="orange"] { --bg: var(--orange); }
+  body[data-state="red"] { --bg: var(--red); }
+  body[data-state="blue"] { --bg: var(--blue); }
+  body[data-state="closed"] { --bg: var(--closed); }
+
+  main {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 2vh, 20px);
+    text-align: center;
+    padding-block: 24px;
+  }
+  .kicker {
+    font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .time {
+    font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: clamp(5rem, 24vw, 17rem);
+    line-height: 0.95;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .desc {
+    font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: clamp(2rem, 8vw, 5.5rem);
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  .remaining {
+    margin-top: clamp(4px, 2vh, 20px);
+    font-size: clamp(1.1rem, 3.6vw, 2rem);
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    text-wrap: balance;
+  }
+  .remaining strong { color: var(--ink); font-weight: 600; }
+  .format {
+    margin-top: clamp(12px, 4vh, 40px);
+    display: inline-flex;
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .format button {
+    font: 600 0.95rem/1 "Barlow", system-ui, sans-serif;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+    padding: 9px 18px;
+    cursor: pointer;
+  }
+  .format button[aria-pressed="true"] {
+    background: #ffffff;
+    color: #1d222c;
+  }
+  .format button:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker" id="kicker">Mr Martin's Clock @ The Sandon School</div>
+  <div class="time" id="time">--</div>
+  <div class="desc" id="desc"></div>
+  <div class="remaining" id="remaining"></div>
+  <div class="format" role="group" aria-label="Clock format">
+    <button type="button" id="fmt12" aria-pressed="true">12 hour</button>
+    <button type="button" id="fmt24" aria-pressed="false">24 hour</button>
+  </div>
+</main>
+
+<script>
+  // Timetables in minutes after midnight. The last entry ends the school day.
+  var MON_THU = [
+    [8 * 60 + 25, "Enrichment / Assembly", "other"],
+    [9 * 60,      "Period 1", "period"],
+    [10 * 60,     "Period 2", "period"],
+    [11 * 60,     "Break", "other"],
+    [11 * 60 + 20, "Period 3", "period"],
+    [12 * 60 + 20, "Period 4", "period"],
+    [13 * 60 + 20, "Lunch", "other"],
+    [13 * 60 + 55, "Period 5", "period"],
+    [14 * 60 + 55, "End of Day", "end"]
+  ];
+  var FRIDAY = [
+    [8 * 60 + 25, "Enrichment / Assembly", "other"],
+    [8 * 60 + 40, "Period 1", "period"],
+    [9 * 60 + 40, "Period 2", "period"],
+    [10 * 60 + 40, "Break", "other"],
+    [11 * 60,     "Period 3", "period"],
+    [12 * 60,     "Period 4", "period"],
+    [13 * 60,     "Lunch", "other"],
+    [13 * 60 + 40, "Period 5", "period"],
+    [14 * 60 + 40, "End of Day", "end"]
+  ];
+
+  var fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    weekday: "short",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hourCycle: "h23"
+  });
+
+  function londonNow() {
+    var out = {};
+    fmt.formatToParts(new Date()).forEach(function (p) { out[p.type] = p.value; });
+    return {
+      weekday: out.weekday,
+      seconds: (+out.hour) * 3600 + (+out.minute) * 60 + (+out.second)
+    };
+  }
+
+  var use24 = false;
+  try { use24 = localStorage.getItem("sandonClock24") === "1"; } catch (e) {}
+
+  function clockText(secs) {
+    var h24 = Math.floor(secs / 3600) % 24;
+    var m = Math.floor((secs % 3600) / 60);
+    if (use24) {
+      return (h24 < 10 ? "0" : "") + h24 + "." + (m < 10 ? "0" : "") + m;
+    }
+    var suffix = h24 >= 12 ? "pm" : "am";
+    var h = h24 % 12 === 0 ? 12 : h24 % 12;
+    return h + "." + (m < 10 ? "0" : "") + m + suffix;
+  }
+
+  function remainingText(secs) {
+    var m = Math.floor(secs / 60);
+    var s = secs % 60;
+    if (m >= 60) {
+      var h = Math.floor(m / 60);
+      return h + " hr " + (m % 60) + " min";
+    }
+    if (m === 0) return s + " s";
+    return m + " min " + (s < 10 ? "0" : "") + s + " s";
+  }
+
+  var els = {
+    time: document.getElementById("time"),
+    desc: document.getElementById("desc"),
+    remaining: document.getElementById("remaining")
+  };
+
+  function tick() {
+    var now = londonNow();
+    var weekend = now.weekday === "Sat" || now.weekday === "Sun";
+    var table = now.weekday === "Fri" ? FRIDAY : MON_THU;
+    var s = now.seconds;
+    var state = "closed";
+    var desc = "The Sandon School is closed.";
+    var remaining = "";
+
+    if (!weekend) {
+      for (var i = 0; i < table.length - 1; i++) {
+        var start = table[i][0] * 60;
+        var next = table[i + 1];
+        if (s >= start && s < next[0] * 60) {
+          var seg = table[i];
+          desc = seg[1];
+          if (seg[2] === "period") {
+            var elapsed = s - start;
+            state = elapsed < 45 * 60 ? "green" : elapsed < 55 * 60 ? "orange" : "red";
+          } else {
+            state = "blue";
+          }
+          var left = next[0] * 60 - s;
+          var target = next[2] === "end" ? "the end of the school day" : next[1];
+          remaining = "<strong>" + remainingText(left) + "</strong> until " + target;
+          break;
+        }
+      }
+    }
+
+    document.body.setAttribute("data-state", state);
+    els.time.textContent = clockText(s);
+    els.desc.textContent = desc;
+    els.remaining.innerHTML = remaining;
+    document.title = clockText(s) + " " + desc.replace(/\.$/, "");
+  }
+
+  var btn12 = document.getElementById("fmt12");
+  var btn24 = document.getElementById("fmt24");
+
+  function setFormat(is24) {
+    use24 = is24;
+    btn12.setAttribute("aria-pressed", String(!is24));
+    btn24.setAttribute("aria-pressed", String(is24));
+    try { localStorage.setItem("sandonClock24", is24 ? "1" : "0"); } catch (e) {}
+    tick();
+  }
+  btn12.addEventListener("click", function () { setFormat(false); });
+  btn24.addEventListener("click", function () { setFormat(true); });
+
+  btn12.setAttribute("aria-pressed", String(!use24));
+  btn24.setAttribute("aria-pressed", String(use24));
+  tick();
+  setInterval(tick, 500);
+</script>
+</body>
+</html>
