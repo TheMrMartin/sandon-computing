@@ -34,14 +34,14 @@
   body[data-state="closed"] { --bg: var(--closed); }
 
   main {
-    min-height: 100%;
+    min-height: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: clamp(8px, 2vh, 20px);
     text-align: center;
-    padding-block: 24px;
+    padding-block: clamp(28px, 6vh, 56px);
   }
   .kicker {
     font-size: clamp(0.85rem, 2.2vw, 1.1rem);
@@ -109,6 +109,69 @@
     outline: 2px solid #ffffff;
     outline-offset: 2px;
   }
+  .timer-section {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-block: clamp(24px, 6vh, 56px) clamp(32px, 8vh, 72px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  .timer-kicker {
+    font-size: clamp(0.85rem, 2.2vw, 1.1rem);
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .presets {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .presets-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+  .presets button, .timer-reset {
+    font: 600 1rem/1 "Barlow", system-ui, sans-serif;
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    border-radius: 999px;
+    padding: 11px 20px;
+    cursor: pointer;
+  }
+  .presets button[aria-pressed="true"] {
+    background: #ffffff;
+    color: #1d222c;
+  }
+  .presets button:focus-visible, .timer-reset:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+  .timer-display {
+    font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: clamp(2.6rem, 11vw, 4.6rem);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .timer-display.finished { color: #ffe58a; }
+  .timer-status {
+    font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+    font-weight: 500;
+    color: var(--ink-soft);
+    min-height: 1.4em;
+  }
+  .timer-reset { display: none; }
+  .timer-reset.visible { display: inline-block; }
   @media (prefers-reduced-motion: reduce) {
     body { transition: none; }
   }
@@ -131,6 +194,26 @@
     </div>
   </div>
 </main>
+
+<section class="timer-section">
+  <div class="timer-kicker">Timer</div>
+  <div class="presets" role="group" aria-label="Timer duration">
+    <div class="presets-row">
+      <button type="button" data-seconds="30">30s</button>
+      <button type="button" data-seconds="60">1m</button>
+      <button type="button" data-seconds="120">2m</button>
+      <button type="button" data-seconds="180">3m</button>
+    </div>
+    <div class="presets-row">
+      <button type="button" data-seconds="300">5m</button>
+      <button type="button" data-seconds="600">10m</button>
+      <button type="button" data-seconds="900">15m</button>
+    </div>
+  </div>
+  <div class="timer-display" id="timerDisplay">--:--</div>
+  <div class="timer-status" id="timerStatus">Choose a duration to start.</div>
+  <button type="button" class="timer-reset" id="timerReset">Stop</button>
+</section>
 
 <script>
   // Timetables in minutes after midnight. The last entry ends the school day.
@@ -284,6 +367,105 @@
   btnSecOn.setAttribute("aria-pressed", String(useSecs));
   tick();
   setInterval(tick, 500);
+
+  // --- Timer ---------------------------------------------------------
+  var audioCtx = null;
+  function unlockAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume().catch(function () {});
+    }
+  }
+
+  // A soft four-note bell arpeggio, in the spirit of a station announcement
+  // chime, rather than a recording of any particular network's jingle.
+  function playChime() {
+    if (!audioCtx) return;
+    var now = audioCtx.currentTime;
+    var notes = [659.25, 783.99, 987.77, 1318.51];
+    notes.forEach(function (freq, i) {
+      var t = now + i * 0.19;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.28, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + 1.3);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 1.35);
+    });
+  }
+
+  var timerDisplay = document.getElementById("timerDisplay");
+  var timerStatus = document.getElementById("timerStatus");
+  var timerResetBtn = document.getElementById("timerReset");
+  var presetButtons = Array.prototype.slice.call(document.querySelectorAll(".presets button"));
+  var timerEndAt = null;
+  var timerLabel = "";
+  var timerHandle = null;
+
+  function mmss(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function clearActivePreset() {
+    presetButtons.forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+  }
+
+  function stopTimer(resetText) {
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+    timerEndAt = null;
+    clearActivePreset();
+    timerDisplay.classList.remove("finished");
+    timerDisplay.textContent = "--:--";
+    timerStatus.textContent = resetText || "Choose a duration to start.";
+    timerResetBtn.classList.remove("visible");
+  }
+
+  function timerTick() {
+    var remaining = Math.round((timerEndAt - Date.now()) / 1000);
+    if (remaining <= 0) {
+      clearInterval(timerHandle);
+      timerHandle = null;
+      timerDisplay.textContent = "00:00";
+      timerDisplay.classList.add("finished");
+      timerStatus.textContent = "Time's up (" + timerLabel + ")";
+      timerResetBtn.textContent = "Reset";
+      playChime();
+      return;
+    }
+    timerDisplay.textContent = mmss(remaining);
+    timerStatus.textContent = "Counting down from " + timerLabel + "…";
+  }
+
+  presetButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      unlockAudio();
+      var secs = parseInt(btn.getAttribute("data-seconds"), 10);
+      timerLabel = btn.textContent;
+      if (timerHandle) clearInterval(timerHandle);
+      clearActivePreset();
+      btn.setAttribute("aria-pressed", "true");
+      timerEndAt = Date.now() + secs * 1000;
+      timerDisplay.classList.remove("finished");
+      timerDisplay.textContent = mmss(secs);
+      timerStatus.textContent = "Counting down from " + timerLabel + "…";
+      timerResetBtn.classList.add("visible");
+      timerResetBtn.textContent = "Stop";
+      timerHandle = setInterval(timerTick, 250);
+    });
+  });
+
+  timerResetBtn.addEventListener("click", function () {
+    stopTimer("Choose a duration to start.");
+  });
 </script>
 </body>
 </html>
