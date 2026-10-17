@@ -172,6 +172,94 @@
   }
   .timer-reset { display: none; }
   .timer-reset.visible { display: inline-block; }
+  .tt-link {
+    font: 600 1rem/1 "Barlow", system-ui, sans-serif;
+    color: var(--ink);
+    text-underline-offset: 4px;
+    text-decoration-thickness: 1.5px;
+    padding: 6px 4px;
+  }
+  .tt-link:focus-visible, .tt-close:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  .tt-dialog {
+    width: min(760px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
+    background: #f7f8fa;
+    color: #1d222c;
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color-scheme: light;
+  }
+  .tt-dialog::backdrop { background: rgba(10, 12, 18, 0.6); }
+  .tt-head {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: #f7f8fa;
+    border-bottom: 1px solid #d8dce3;
+  }
+  .tt-head h2 {
+    margin: 0;
+    font: 600 1.6rem/1.1 "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  }
+  .tt-close {
+    font: 600 0.95rem/1 "Barlow", system-ui, sans-serif;
+    color: #1d222c;
+    background: #ffffff;
+    border: 1.5px solid #9aa2b1;
+    border-radius: 999px;
+    padding: 9px 18px;
+    cursor: pointer;
+  }
+  .tt-tables {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 16px 20px 22px;
+  }
+  .tt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .tt-table caption {
+    text-align: left;
+    font: 600 1.15rem/1.2 "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    padding-bottom: 8px;
+  }
+  .tt-table.is-today caption::after {
+    content: " (today)";
+    font-weight: 500;
+    color: #4a5263;
+  }
+  .tt-table th, .tt-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e1e4ea;
+    text-align: left;
+    font-weight: 400;
+  }
+  .tt-table thead th {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5263;
+    border-bottom: 1.5px solid #9aa2b1;
+  }
+  .tt-table td { text-align: right; }
+  .tt-table thead th:not(:first-child) { text-align: right; }
+  .tt-table tr.is-period th { font-weight: 600; }
+  .tt-table tr[aria-current] {
+    background: var(--bg);
+    color: #ffffff;
+  }
+  .tt-table tr[aria-current] th, .tt-table tr[aria-current] td { border-bottom-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     body { transition: none; }
   }
@@ -192,8 +280,17 @@
       <button type="button" id="secOff" aria-pressed="true">No seconds</button>
       <button type="button" id="secOn" aria-pressed="false">Seconds</button>
     </div>
+    <a href="#timetable" class="tt-link" id="ttOpen">View timetable</a>
   </div>
 </main>
+
+<dialog id="timetable" class="tt-dialog" aria-labelledby="ttTitle">
+  <div class="tt-head">
+    <h2 id="ttTitle">School day timetable</h2>
+    <button type="button" class="tt-close" id="ttClose">Close</button>
+  </div>
+  <div class="tt-tables" id="ttTables"></div>
+</dialog>
 
 <section class="timer-section">
   <div class="timer-kicker">Timer</div>
@@ -218,24 +315,30 @@
 <script>
   // Timetables in minutes after midnight. The last entry ends the school day.
   var MON_THU = [
-    [8 * 60 + 25, "Enrichment / Assembly", "other"],
-    [9 * 60,      "Period 1", "period"],
-    [10 * 60,     "Period 2", "period"],
-    [11 * 60,     "Break", "other"],
+    [8 * 60 + 25,  "Enrichment", "other"],
+    [8 * 60 + 50,  "Break", "other"],
+    [8 * 60 + 55,  "Period 1", "period"],
+    [9 * 60 + 55,  "Changeover", "other"],
+    [10 * 60,      "Period 2", "period"],
+    [11 * 60,      "Break", "other"],
     [11 * 60 + 20, "Period 3", "period"],
-    [12 * 60 + 20, "Period 4", "period"],
-    [13 * 60 + 20, "Lunch", "other"],
+    [12 * 60 + 20, "Changeover", "other"],
+    [12 * 60 + 25, "Period 4", "period"],
+    [13 * 60 + 25, "Lunch Break", "other"],
     [13 * 60 + 55, "Period 5", "period"],
     [14 * 60 + 55, "End of Day", "end"]
   ];
   var FRIDAY = [
-    [8 * 60 + 25, "Enrichment / Assembly", "other"],
-    [8 * 60 + 40, "Period 1", "period"],
-    [9 * 60 + 40, "Period 2", "period"],
-    [10 * 60 + 40, "Break", "other"],
-    [11 * 60,     "Period 3", "period"],
-    [12 * 60,     "Period 4", "period"],
-    [13 * 60,     "Lunch", "other"],
+    [8 * 60 + 25,  "Enrichment", "other"],
+    [8 * 60 + 35,  "Break", "other"],
+    [8 * 60 + 40,  "Period 1", "period"],
+    [9 * 60 + 40,  "Changeover", "other"],
+    [9 * 60 + 45,  "Period 2", "period"],
+    [10 * 60 + 45, "Break", "other"],
+    [11 * 60 + 5,  "Period 3", "period"],
+    [12 * 60 + 5,  "Changeover", "other"],
+    [12 * 60 + 10, "Period 4", "period"],
+    [13 * 60 + 10, "Lunch Break", "other"],
     [13 * 60 + 40, "Period 5", "period"],
     [14 * 60 + 40, "End of Day", "end"]
   ];
@@ -297,6 +400,84 @@
     remaining: document.getElementById("remaining")
   };
 
+  // --- Timetable pop-up -----------------------------------------------
+  var current = { table: null, index: -1 };
+  var ttDialog = document.getElementById("timetable");
+  var ttTables = document.getElementById("ttTables");
+
+  function hhmm(mins) {
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+  }
+
+  function buildTable(caption, table) {
+    var wrap = document.createElement("div");
+    wrap.className = "tt-block";
+    var t = document.createElement("table");
+    t.className = "tt-table";
+    t._source = table;
+    var cap = document.createElement("caption");
+    cap.textContent = caption;
+    t.appendChild(cap);
+    var head = document.createElement("thead");
+    head.innerHTML = "<tr><th scope=\"col\">Session</th><th scope=\"col\">Start</th><th scope=\"col\">End</th></tr>";
+    t.appendChild(head);
+    var body = document.createElement("tbody");
+    for (var i = 0; i < table.length - 1; i++) {
+      var tr = document.createElement("tr");
+      if (table[i][2] === "period") tr.className = "is-period";
+      var th = document.createElement("th");
+      th.scope = "row";
+      th.textContent = table[i][1];
+      var a = document.createElement("td");
+      a.textContent = hhmm(table[i][0]);
+      var b = document.createElement("td");
+      b.textContent = hhmm(table[i + 1][0]);
+      tr.appendChild(th); tr.appendChild(a); tr.appendChild(b);
+      body.appendChild(tr);
+    }
+    t.appendChild(body);
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  ttTables.appendChild(buildTable("Monday to Thursday", MON_THU));
+  ttTables.appendChild(buildTable("Friday", FRIDAY));
+
+  function markCurrentRow() {
+    Array.prototype.forEach.call(ttTables.querySelectorAll("table"), function (t) {
+      var today = t._source === current.table;
+      t.classList.toggle("is-today", today);
+      Array.prototype.forEach.call(t.tBodies[0].rows, function (row, i) {
+        if (today && i === current.index) row.setAttribute("aria-current", "time");
+        else row.removeAttribute("aria-current");
+      });
+    });
+  }
+
+  function openTimetable() {
+    markCurrentRow();
+    if (!ttDialog.open) ttDialog.showModal();
+  }
+
+  function clearHash() {
+    if (location.hash === "#timetable") {
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    }
+  }
+
+  document.getElementById("ttOpen").addEventListener("click", function (e) {
+    e.preventDefault();
+    try { history.replaceState(null, "", "#timetable"); } catch (err) {}
+    openTimetable();
+  });
+  document.getElementById("ttClose").addEventListener("click", function () { ttDialog.close(); });
+  ttDialog.addEventListener("click", function (e) { if (e.target === ttDialog) ttDialog.close(); });
+  ttDialog.addEventListener("close", clearHash);
+  window.addEventListener("hashchange", function () {
+    if (location.hash === "#timetable") openTimetable();
+  });
+
   function tick() {
     var now = londonNow();
     var weekend = now.weekday === "Sat" || now.weekday === "Sun";
@@ -305,6 +486,8 @@
     var state = "closed";
     var desc = "The Sandon School is closed.";
     var remaining = "";
+    current.table = weekend ? null : table;
+    current.index = -1;
 
     if (!weekend) {
       for (var i = 0; i < table.length - 1; i++) {
@@ -312,6 +495,7 @@
         var next = table[i + 1];
         if (s >= start && s < next[0] * 60) {
           var seg = table[i];
+          current.index = i;
           desc = seg[1];
           if (seg[2] === "period") {
             var elapsed = s - start;
@@ -333,6 +517,7 @@
     els.desc.textContent = desc;
     els.remaining.innerHTML = remaining;
     document.title = clockText(s) + " " + desc.replace(/\.$/, "");
+    if (ttDialog.open) markCurrentRow();
   }
 
   var btn12 = document.getElementById("fmt12");
@@ -367,6 +552,7 @@
   btnSecOn.setAttribute("aria-pressed", String(useSecs));
   tick();
   setInterval(tick, 500);
+  if (location.hash === "#timetable") openTimetable();
 
   // --- Timer ---------------------------------------------------------
   var audioCtx = null;
