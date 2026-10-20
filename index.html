@@ -279,33 +279,26 @@
 
 <script>
   // Timetables in minutes after midnight. The last entry ends the school day.
+  // Each session: [start, end, label, kind], in minutes after midnight.
   var MON_THU = [
-    [8 * 60 + 25,  "Enrichment", "other"],
-    [8 * 60 + 50,  "Changeover", "other"],
-    [8 * 60 + 55,  "Period 1", "period"],
-    [9 * 60 + 55,  "Changeover", "other"],
-    [10 * 60,      "Period 2", "period"],
-    [11 * 60,      "Break", "other"],
-    [11 * 60 + 20, "Period 3", "period"],
-    [12 * 60 + 20, "Changeover", "other"],
-    [12 * 60 + 25, "Period 4", "period"],
-    [13 * 60 + 25, "Lunch Break", "other"],
-    [13 * 60 + 55, "Period 5", "period"],
-    [14 * 60 + 55, "End of Day", "end"]
+    [8 * 60 + 25, 9 * 60, "Enrichment", "other"],
+    [9 * 60, 10 * 60, "Period 1", "period"],
+    [10 * 60, 11 * 60, "Period 2", "period"],
+    [11 * 60, 11 * 60 + 20, "Break", "other"],
+    [11 * 60 + 20, 12 * 60 + 20, "Period 3", "period"],
+    [12 * 60 + 20, 13 * 60 + 20, "Period 4", "period"],
+    [13 * 60 + 20, 13 * 60 + 55, "Lunch Break", "other"],
+    [13 * 60 + 55, 14 * 60 + 55, "Period 5", "period"]
   ];
   var FRIDAY = [
-    [8 * 60 + 25,  "Enrichment", "other"],
-    [8 * 60 + 35,  "Changeover", "other"],
-    [8 * 60 + 40,  "Period 1", "period"],
-    [9 * 60 + 40,  "Changeover", "other"],
-    [9 * 60 + 45,  "Period 2", "period"],
-    [10 * 60 + 45, "Break", "other"],
-    [11 * 60 + 5,  "Period 3", "period"],
-    [12 * 60 + 5,  "Changeover", "other"],
-    [12 * 60 + 10, "Period 4", "period"],
-    [13 * 60 + 10, "Lunch Break", "other"],
-    [13 * 60 + 40, "Period 5", "period"],
-    [14 * 60 + 40, "End of Day", "end"]
+    [8 * 60 + 25, 8 * 60 + 45, "Enrichment", "other"],
+    [8 * 60 + 45, 9 * 60 + 45, "Period 1", "period"],
+    [9 * 60 + 45, 10 * 60 + 45, "Period 2", "period"],
+    [10 * 60 + 45, 11 * 60 + 5, "Break", "other"],
+    [11 * 60 + 5, 12 * 60 + 5, "Period 3", "period"],
+    [12 * 60 + 5, 13 * 60 + 5, "Period 4", "period"],
+    [13 * 60 + 5, 13 * 60 + 40, "Lunch Break", "other"],
+    [13 * 60 + 40, 14 * 60 + 40, "Period 5", "period"]
   ];
 
   var fmt = new Intl.DateTimeFormat("en-GB", {
@@ -374,16 +367,16 @@
     head.innerHTML = "<tr><th scope=\"col\">Session</th><th scope=\"col\">Start</th><th scope=\"col\">End</th></tr>";
     t.appendChild(head);
     var body = document.createElement("tbody");
-    for (var i = 0; i < table.length - 1; i++) {
+    for (var i = 0; i < table.length; i++) {
       var tr = document.createElement("tr");
-      if (table[i][2] === "period") tr.className = "is-period";
+      if (table[i][3] === "period") tr.className = "is-period";
       var th = document.createElement("th");
       th.scope = "row";
-      th.textContent = table[i][1];
+      th.textContent = table[i][2];
       var a = document.createElement("td");
       a.textContent = hhmm(table[i][0]);
       var b = document.createElement("td");
-      b.textContent = hhmm(table[i + 1][0]);
+      b.textContent = hhmm(table[i][1]);
       tr.appendChild(th); tr.appendChild(a); tr.appendChild(b);
       body.appendChild(tr);
     }
@@ -441,22 +434,30 @@
     current.index = -1;
 
     if (!weekend) {
-      for (var i = 0; i < table.length - 1; i++) {
-        var start = table[i][0] * 60;
+      for (var i = 0; i < table.length; i++) {
+        var seg = table[i];
+        var start = seg[0] * 60, end = seg[1] * 60;
         var next = table[i + 1];
-        if (s >= start && s < next[0] * 60) {
-          var seg = table[i];
+        if (s >= start && s < end) {
           current.index = i;
-          desc = seg[1];
-          if (seg[2] === "period") {
+          desc = seg[2];
+          if (seg[3] === "period") {
             var elapsed = s - start;
             state = elapsed < 45 * 60 ? "green" : elapsed < 55 * 60 ? "orange" : "red";
           } else {
             state = "blue";
           }
-          var left = next[0] * 60 - s;
-          var target = next[2] === "end" ? "the end of the school day" : next[1];
-          remaining = "<strong>" + remainingText(left) + "</strong> until " + target;
+          var target = !next ? "the end of the school day"
+            : next[0] === seg[1] ? next[2]
+            : "the end of " + seg[2];
+          remaining = "<strong>" + remainingText(end - s) + "</strong> until " + target;
+          break;
+        }
+        // Short unnamed gap between two sessions (none in the current timetable)
+        if (next && s >= end && s < next[0] * 60) {
+          state = "blue";
+          desc = "Between lessons";
+          remaining = "<strong>" + remainingText(next[0] * 60 - s) + "</strong> until " + next[2];
           break;
         }
       }
