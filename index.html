@@ -227,11 +227,12 @@
   .tt-table td { text-align: right; }
   .tt-table thead th:not(:first-child) { text-align: right; }
   .tt-table tr.is-period th { font-weight: 600; }
-  .tt-table tr[aria-current] {
+  .tt-table tbody tr:nth-child(odd) { background: #eaedf2; }
+  .tt-table tbody tr[aria-current] {
     background: var(--bg);
     color: #ffffff;
   }
-  .tt-table tr[aria-current] th, .tt-table tr[aria-current] td { border-bottom-color: transparent; }
+  .tt-table tbody tr[aria-current] th, .tt-table tbody tr[aria-current] td { border-bottom-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     body { transition: none; }
   }
