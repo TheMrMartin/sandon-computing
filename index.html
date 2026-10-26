@@ -281,23 +281,29 @@
   // Timetables in minutes after midnight. The last entry ends the school day.
   // Each session: [start, end, label, kind], in minutes after midnight.
   var MON_THU = [
-    [8 * 60 + 25, 9 * 60, "Enrichment", "other"],
-    [9 * 60, 10 * 60, "Period 1", "period"],
+    [8 * 60 + 25, 8 * 60 + 50, "Enrichment", "other"],
+    [8 * 60 + 50, 8 * 60 + 55, "Changeover", "other"],
+    [8 * 60 + 55, 9 * 60 + 55, "Period 1", "period"],
+    [9 * 60 + 55, 10 * 60, "Changeover", "other"],
     [10 * 60, 11 * 60, "Period 2", "period"],
     [11 * 60, 11 * 60 + 20, "Break", "other"],
     [11 * 60 + 20, 12 * 60 + 20, "Period 3", "period"],
-    [12 * 60 + 20, 13 * 60 + 20, "Period 4", "period"],
-    [13 * 60 + 20, 13 * 60 + 55, "Lunch Break", "other"],
+    [12 * 60 + 20, 12 * 60 + 25, "Changeover", "other"],
+    [12 * 60 + 25, 13 * 60 + 25, "Period 4", "period"],
+    [13 * 60 + 25, 13 * 60 + 55, "Lunch", "other"],
     [13 * 60 + 55, 14 * 60 + 55, "Period 5", "period"]
   ];
   var FRIDAY = [
-    [8 * 60 + 25, 8 * 60 + 45, "Enrichment", "other"],
-    [8 * 60 + 45, 9 * 60 + 45, "Period 1", "period"],
+    [8 * 60 + 25, 8 * 60 + 35, "Enrichment", "other"],
+    [8 * 60 + 35, 8 * 60 + 40, "Changeover", "other"],
+    [8 * 60 + 40, 9 * 60 + 40, "Period 1", "period"],
+    [9 * 60 + 40, 9 * 60 + 45, "Changeover", "other"],
     [9 * 60 + 45, 10 * 60 + 45, "Period 2", "period"],
     [10 * 60 + 45, 11 * 60 + 5, "Break", "other"],
     [11 * 60 + 5, 12 * 60 + 5, "Period 3", "period"],
-    [12 * 60 + 5, 13 * 60 + 5, "Period 4", "period"],
-    [13 * 60 + 5, 13 * 60 + 40, "Lunch Break", "other"],
+    [12 * 60 + 5, 12 * 60 + 10, "Changeover", "other"],
+    [12 * 60 + 10, 13 * 60 + 10, "Period 4", "period"],
+    [13 * 60 + 10, 13 * 60 + 40, "Lunch", "other"],
     [13 * 60 + 40, 14 * 60 + 40, "Period 5", "period"]
   ];
 
